@@ -8,17 +8,26 @@ any live search path.
 
 from __future__ import annotations
 
+import logging
 from functools import lru_cache
 
 from openai import AsyncOpenAI
 
 from app.config import get_settings
+from app.observability import get_langfuse
+
+logger = logging.getLogger("invoice_search")
 
 # ── Langfuse observability ────────────────────────────────────────────────────
 # This service calls OpenAI directly, so the simplest way to trace embedding
-# calls is Langfuse's drop-in wrapper: change the import above to
-#     from langfuse.openai import AsyncOpenAI
-# and nothing else — every request through `get_client()` is then traced.
+# calls is Langfuse's drop-in wrapper: ``from langfuse.openai import AsyncOpenAI``.
+# It's API-compatible with the plain client, so every request through
+# `get_client()` is traced automatically with no other changes.
+#
+# The wrapper is only used when Langfuse is actually configured. When
+# credentials are absent, `get_langfuse()` returns ``None`` (see
+# ``app/observability.py``) and we fall back to the plain OpenAI client so local
+# development and tests don't require a Langfuse project.
 #
 # If an embedding call is ever routed through LangChain instead (e.g.
 # `langchain_openai.OpenAIEmbeddings`), attach the shared handler on the call:
@@ -36,9 +45,21 @@ def get_client() -> AsyncOpenAI:
     Embeddings are served through OpenRouter (see ``app/config.py``), which is
     OpenAI-API compatible, so the OpenAI SDK talks to it directly given the
     matching ``base_url`` and key.
+
+    When Langfuse is configured, the client is Langfuse's drop-in
+    ``AsyncOpenAI`` wrapper, so every embedding call is traced automatically.
+    Otherwise it's the plain OpenAI client.
     """
     settings = get_settings()
-    return AsyncOpenAI(
+
+    client_cls = AsyncOpenAI
+    if get_langfuse() is not None:
+        from langfuse.openai import AsyncOpenAI as LangfuseAsyncOpenAI
+
+        client_cls = LangfuseAsyncOpenAI
+        logger.info("Langfuse enabled; tracing embedding calls")
+
+    return client_cls(
         api_key=settings.openrouter_api_key,
         base_url=settings.embedding_base_url,
     )
