@@ -2,12 +2,14 @@
 
 A Python **FastAPI** microservice that provides **semantic search** for the
 **InvoiceGen** invoice management application. It embeds natural-language queries
-with **OpenAI embeddings** and runs **hybrid search** — pgvector similarity
+with **OpenRouter embeddings** and runs **hybrid search** — pgvector similarity
 combined with structured SQL filters — against the existing InvoiceGen Postgres
 database hosted on **Neon**.
 
-> Status: project scaffold only. The FastAPI app starts and exposes health
-> checks, but search logic is not implemented yet (`/search` returns `501`).
+> Status: hybrid search is implemented. The FastAPI app starts, exposes health
+> checks, and `POST /search` runs a real pgvector + SQL-filter query against the
+> InvoiceGen `documents` table. Authentication between the C# backend and this
+> service is still outstanding.
 
 ## Development workflow (MANDATORY)
 
@@ -124,7 +126,7 @@ plain-pip environments.
 uv sync
 
 # Configure environment
-cp .env.example .env   # then fill in DATABASE_URL and OPENAI_API_KEY
+cp .env.example .env   # then fill in DATABASE_URL and OPENROUTER_API_KEY
 
 # Run the service (http://localhost:8000, docs at /docs)
 uv run uvicorn app.main:app --reload
@@ -134,19 +136,26 @@ uv run uvicorn app.main:app --reload
 
 - `GET /health` — liveness (no DB required).
 - `GET /health/db` — readiness; verifies the Neon database is reachable.
-- `POST /search` — hybrid search (currently `501 Not Implemented`).
+- `POST /search` — hybrid semantic + filter search over the `documents` table.
 
 ## Configuration
 
 See `.env.example`. Key variables:
 
 - `DATABASE_URL` — Neon Postgres connection string (`sslmode=require`).
-- `OPENAI_API_KEY` — OpenAI API key.
-- `OPENAI_EMBEDDING_MODEL` / `OPENAI_EMBEDDING_DIMENSIONS` — must match the
-  dimensionality of the `vector` column in the database.
+- `OPENROUTER_API_KEY` — OpenRouter API key (used for embeddings).
+- `EMBEDDING_MODEL` / `EMBEDDING_DIMENSIONS` — must match the dimensionality of
+  the `Embedding` `vector` column in the database (currently `vector(1024)`).
+
+## Search behaviour
+
+`POST /search` embeds the query, then runs a single query that orders `documents`
+by pgvector cosine distance (`<=>`) and applies the structured filters as SQL
+`WHERE` clauses. Results are ranked by cosine similarity (`score = 1 - distance`)
+and capped at `limit`. Soft-deleted rows (`DeletedAt IS NOT NULL`) and rows with
+no embedding are excluded. Invoice and customer IDs are UUID strings, matching
+the InvoiceGen schema this service reads.
 
 ## Not implemented yet
 
-- Actual embedding generation (`app/embeddings.py`).
-- Hybrid search query construction and execution (`app/search.py`).
 - Authentication between the C# backend and this service.

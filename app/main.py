@@ -92,15 +92,14 @@ async def health_db() -> dict[str, str]:
 
 @app.post("/search", response_model=SearchResponse)
 async def search(request: SearchRequest) -> SearchResponse:
-    """Hybrid semantic + filter search over invoices.
-
-    Not implemented yet — returns 501 until search logic lands.
-    """
+    """Hybrid semantic + filter search over invoices."""
     try:
         return await hybrid_search(request)
-    except NotImplementedError as exc:
+    except RuntimeError as exc:
+        # Raised when the database pool is not open (see app/database.py).
+        logger.exception("Search failed: database unavailable")
         raise HTTPException(
-            status_code=status.HTTP_501_NOT_IMPLEMENTED,
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
             detail=str(exc),
         ) from exc
 
