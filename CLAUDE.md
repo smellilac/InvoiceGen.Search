@@ -9,6 +9,35 @@ database hosted on **Neon**.
 > Status: project scaffold only. The FastAPI app starts and exposes health
 > checks, but search logic is not implemented yet (`/search` returns `501`).
 
+## Development workflow (MANDATORY)
+
+Follow these steps for **every** new feature or change. **Never skip steps.
+Never commit directly to `master`.**
+
+1. **Git setup**
+   - Fetch latest from origin: `git fetch origin`
+   - Ensure `master` is up to date: `git checkout master && git pull origin master`
+   - Create a feature branch: `git checkout -b feature/<short-description>`
+
+2. **Planning**
+   - Update `CLAUDE.md` or relevant docs to reflect what is about to change.
+   - State clearly what will be implemented before writing any code.
+
+3. **Implementation**
+   - Write the code.
+   - Follow existing conventions in the codebase.
+
+4. **Verification**
+   - Run available tests.
+   - Verify the app starts without errors.
+   - Check imports are clean.
+
+5. **Commit & push**
+   - Stage relevant files only (**never commit `.env`**).
+   - Write a descriptive commit message following conventional commits.
+   - Push the branch to origin.
+   - Report what was done and what branch to find it on.
+
 ## What this service does
 
 - Accepts a search request (natural-language `query` + optional structured
