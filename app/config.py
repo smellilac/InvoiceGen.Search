@@ -15,10 +15,15 @@ class Settings(BaseSettings):
     # Neon Postgres
     database_url: str = ""
 
-    # OpenAI embeddings
-    openai_api_key: str = ""
-    openai_embedding_model: str = "text-embedding-3-small"
-    openai_embedding_dimensions: int = 1536
+    # OpenRouter (LLM + embeddings)
+    openrouter_api_key: str = ""
+    llm_model: str = "qwen/qwen3-8b:free"
+    llm_base_url: str = "https://openrouter.ai/api/v1"
+
+    # Embeddings
+    embedding_model: str = "qwen/qwen3-embedding-0.6b"
+    embedding_base_url: str = "https://openrouter.ai/api/v1"
+    embedding_dimensions: int = 1024
 
     # Langfuse observability (optional — disabled when keys are empty)
     langfuse_public_key: str = ""
