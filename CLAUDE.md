@@ -49,11 +49,29 @@ Follow the workflow for everything else without exception.
    - Verify the app starts without errors.
    - Check imports are clean.
 
-5. **Commit & push**
+5. **Commit & push & PR**
    - Stage relevant files only (**never commit `.env`**).
    - Write a descriptive commit message following conventional commits.
    - Push the branch to origin.
-   - Report what was done and what branch to find it on.
+   - Create a Pull Request to `master` using the `gh` CLI:
+
+     ```bash
+     gh pr create --title "<short description>" --body "<what changed and why>" --base master
+     ```
+
+   - Report the PR link and **STOP**.
+   - Wait for explicit confirmation before doing anything else.
+   - Only after the user says "merge" or "approve" — run:
+
+     ```bash
+     gh pr merge <pr-number> --merge --delete-branch
+     ```
+
+   - **Never merge without explicit user confirmation.**
+
+   > **IMPORTANT:** Creating the PR is the end of the development cycle.
+   > The next task starts only after the PR is merged and the user gives a
+   > new instruction.
 
 ## What this service does
 
