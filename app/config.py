@@ -20,6 +20,11 @@ class Settings(BaseSettings):
     openai_embedding_model: str = "text-embedding-3-small"
     openai_embedding_dimensions: int = 1536
 
+    # Langfuse observability (optional — disabled when keys are empty)
+    langfuse_public_key: str = ""
+    langfuse_secret_key: str = ""
+    langfuse_host: str = "https://cloud.langfuse.com"
+
     # Service
     app_host: str = "0.0.0.0"
     app_port: int = 8000

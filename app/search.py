@@ -52,4 +52,15 @@ async def hybrid_search(request: SearchRequest) -> SearchResponse:
          (pgvector cosine distance) with WHERE clauses from ``request.filters``.
       3. Execute against the Neon pool and map rows to ``SearchResult``.
     """
+    # Langfuse observability: when step 1 (or any future re-ranking / query
+    # rewriting) is driven through LangChain, pass the shared handler on the call
+    # so the whole search is captured as one trace, e.g.:
+    #
+    #     from app.observability import get_langfuse_handler
+    #     handler = get_langfuse_handler()
+    #     callbacks = [handler] if handler else []
+    #     result = await chain.ainvoke(request.query, config={"callbacks": callbacks})
+    #
+    # For direct OpenAI embedding calls, use the langfuse.openai wrapper instead
+    # (see app/embeddings.py) — no handler needed there.
     raise NotImplementedError("Hybrid search is not implemented yet")

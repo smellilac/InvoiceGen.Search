@@ -14,6 +14,20 @@ from openai import AsyncOpenAI
 
 from app.config import get_settings
 
+# ── Langfuse observability ────────────────────────────────────────────────────
+# This service calls OpenAI directly, so the simplest way to trace embedding
+# calls is Langfuse's drop-in wrapper: change the import above to
+#     from langfuse.openai import AsyncOpenAI
+# and nothing else — every request through `get_client()` is then traced.
+#
+# If an embedding call is ever routed through LangChain instead (e.g.
+# `langchain_openai.OpenAIEmbeddings`), attach the shared handler on the call:
+#     from app.observability import get_langfuse_handler
+#     handler = get_langfuse_handler()
+#     callbacks = [handler] if handler else []
+#     await embeddings.aembed_query(text, config={"callbacks": callbacks})
+# ──────────────────────────────────────────────────────────────────────────────
+
 
 @lru_cache
 def get_client() -> AsyncOpenAI:
