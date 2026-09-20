@@ -31,23 +31,52 @@ from app.config import get_settings
 
 @lru_cache
 def get_client() -> AsyncOpenAI:
-    """Return a cached AsyncOpenAI client."""
+    """Return a cached AsyncOpenAI client pointed at the embeddings provider.
+
+    Embeddings are served through OpenRouter (see ``app/config.py``), which is
+    OpenAI-API compatible, so the OpenAI SDK talks to it directly given the
+    matching ``base_url`` and key.
+    """
     settings = get_settings()
-    return AsyncOpenAI(api_key=settings.openai_api_key)
+    return AsyncOpenAI(
+        api_key=settings.openrouter_api_key,
+        base_url=settings.embedding_base_url,
+    )
+
+
+def _validate_dimensions(vector: list[float]) -> list[float]:
+    """Ensure an embedding matches the configured (and DB column) dimensionality.
+
+    A mismatch here means pgvector's ``<=>`` operator would raise at query time,
+    so failing fast with a clear message is friendlier than a cryptic SQL error.
+    """
+    expected = get_settings().embedding_dimensions
+    if len(vector) != expected:
+        raise ValueError(
+            f"Embedding has {len(vector)} dimensions, expected {expected}. "
+            "Check EMBEDDING_MODEL / EMBEDDING_DIMENSIONS against the DB column."
+        )
+    return vector
 
 
 async def embed_text(text: str) -> list[float]:
-    """Generate an embedding vector for a single piece of text.
-
-    Not implemented yet — this is the seam where the OpenAI embeddings call
-    will live once search logic is built out.
-    """
-    raise NotImplementedError("Embedding generation is not implemented yet")
+    """Generate an embedding vector for a single piece of text."""
+    settings = get_settings()
+    response = await get_client().embeddings.create(
+        model=settings.embedding_model,
+        input=text,
+    )
+    return _validate_dimensions(response.data[0].embedding)
 
 
 async def embed_batch(texts: list[str]) -> list[list[float]]:
-    """Generate embeddings for a batch of texts.
-
-    Not implemented yet.
-    """
-    raise NotImplementedError("Batch embedding generation is not implemented yet")
+    """Generate embeddings for a batch of texts, preserving input order."""
+    if not texts:
+        return []
+    settings = get_settings()
+    response = await get_client().embeddings.create(
+        model=settings.embedding_model,
+        input=texts,
+    )
+    ordered = sorted(response.data, key=lambda item: item.index)
+    return [_validate_dimensions(item.embedding) for item in ordered]
