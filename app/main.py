@@ -17,10 +17,27 @@ from app.search import SearchRequest, SearchResponse, hybrid_search
 logger = logging.getLogger("invoice_search")
 
 
+def _configure_logging(level: str) -> None:
+    """Attach a handler to the app logger so its logs are actually emitted.
+
+    Without this, the ``invoice_search`` logger has no handler of its own and
+    falls back to uvicorn's WARNING-level "last resort" handler — which silently
+    drops every ``logger.info`` line (e.g. "Langfuse observability connected").
+    Runs on startup regardless of how uvicorn is launched.
+    """
+    logger.setLevel(level.upper())
+    if not logger.handlers:
+        handler = logging.StreamHandler()
+        handler.setFormatter(logging.Formatter("%(levelname)s:     %(message)s"))
+        logger.addHandler(handler)
+        logger.propagate = False
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Open the DB pool on startup, close it on shutdown."""
     settings = get_settings()
+    _configure_logging(settings.log_level)
     if settings.database_url:
         try:
             await open_pool()
