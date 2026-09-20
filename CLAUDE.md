@@ -14,6 +14,23 @@ database hosted on **Neon**.
 Follow these steps for **every** new feature or change. **Never skip steps.
 Never commit directly to `master`.**
 
+### When to trigger this workflow
+
+**Trigger the workflow for:**
+
+- Any change to tracked files in the repository (`.gitignore`, config
+  files, source code, documentation, `requirements.txt`, etc.).
+- Always — even for small, one-line changes.
+
+**Do NOT trigger the workflow for:**
+
+- Creating local-only files that are gitignored (`.env`, local configs,
+  temp files).
+- Read-only operations (searching, reading files, running tests without
+  code changes).
+
+Follow the workflow for everything else without exception.
+
 1. **Git setup**
    - Fetch latest from origin: `git fetch origin`
    - Ensure `master` is up to date: `git checkout master && git pull origin master`
