@@ -8,8 +8,8 @@ database hosted on **Neon**.
 
 > Status: hybrid search is implemented. The FastAPI app starts, exposes health
 > checks, and `POST /search` runs a real pgvector + SQL-filter query against the
-> InvoiceGen `documents` table. Authentication between the C# backend and this
-> service is still outstanding.
+> InvoiceGen `documents` table. `POST /search` is protected by JWT bearer
+> authentication using the same HS256 tokens the C# backend issues to its users.
 
 ## Development workflow (MANDATORY)
 
@@ -102,9 +102,10 @@ InvoiceGen (C#)  ──HTTP──▶  invoice-search-service (FastAPI)  ──�
 - **Integration contract.** The C# backend sends `POST /search` with a JSON body
   matching `SearchRequest` (see `app/search.py`) and receives `SearchResponse`.
   OpenAPI docs are available at `/docs` when the service is running.
-- **Auth / networking.** Intended to run inside the same private network /
-  service mesh as the backend. Add auth (e.g. an API key or mTLS) before exposing
-  it publicly — not yet implemented.
+- **Auth / networking.** `POST /search` requires a JWT bearer token — the same
+  HS256 token the C# backend issues to its users. The service validates the
+  token's signature, expiry, issuer, and audience (see `app/auth.py`) and passes
+  the `sub` claim (user id) into the search. The health endpoints stay public.
 
 ## Project layout
 
@@ -115,6 +116,7 @@ InvoiceGen (C#)  ──HTTP──▶  invoice-search-service (FastAPI)  ──�
 | `app/database.py`    | Neon Postgres async connection pool (psycopg + pgvector)   |
 | `app/embeddings.py`  | OpenAI embeddings client and helpers (stubbed)             |
 | `app/search.py`      | Search request/response models and `hybrid_search` (stub)  |
+| `app/auth.py`        | JWT bearer validation dependency (`require_user`)          |
 
 ## Local development
 
@@ -146,6 +148,9 @@ See `.env.example`. Key variables:
 - `OPENROUTER_API_KEY` — OpenRouter API key (used for embeddings).
 - `EMBEDDING_MODEL` / `EMBEDDING_DIMENSIONS` — must match the dimensionality of
   the `Embedding` `vector` column in the database (currently `vector(1024)`).
+- `JWT_SECRET_KEY` / `JWT_ISSUER` / `JWT_AUDIENCE` — shared HS256 signing key
+  and the expected issuer/audience for validating the C# backend's JWTs. Must
+  match the backend's token configuration.
 
 ## Search behaviour
 
@@ -156,6 +161,19 @@ and capped at `limit`. Soft-deleted rows (`DeletedAt IS NOT NULL`) and rows with
 no embedding are excluded. Invoice and customer IDs are UUID strings, matching
 the InvoiceGen schema this service reads.
 
+## Authentication
+
+`POST /search` is protected by the `require_user` dependency in `app/auth.py`.
+Callers must send `Authorization: Bearer <jwt>`. The token is the HS256 JWT the
+C# InvoiceGen backend issues to its users; the service verifies its signature
+(`JWT_SECRET_KEY`), expiry, issuer (`JWT_ISSUER`), and audience (`JWT_AUDIENCE`),
+then extracts the user id from the `sub` claim. A missing, malformed, expired, or
+otherwise invalid token returns `401 Unauthorized`. The health endpoints
+(`GET /health`, `GET /health/db`) remain public. The validated user id is
+threaded into `hybrid_search` for future per-user result scoping (not yet applied
+to the SQL).
+
 ## Not implemented yet
 
-- Authentication between the C# backend and this service.
+- Per-user filtering of search results (the `sub` user id is threaded through
+  `hybrid_search` but not yet used in the SQL).

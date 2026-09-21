@@ -7,6 +7,8 @@ psycopg[binary,pool]>=3.2.0
 pgvector>=0.3.0
 openai>=1.51.0
 python-dotenv>=1.0.0
+# JWT validation for the C# backend's HS256 bearer tokens.
+python-jose[cryptography]>=3.3.0
 # Langfuse observability. The LangChain integration ships *inside* the langfuse
 # package (langfuse.langchain.CallbackHandler); it only needs `langchain` present
 # to activate. Do NOT add the separate PyPI "langfuse-langchain" distribution — it
