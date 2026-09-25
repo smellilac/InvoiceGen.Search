@@ -47,6 +47,26 @@ class SearchResponse(BaseModel):
     results: list[SearchResult]
 
 
+class IndexRequest(BaseModel):
+    """Request to (re)generate and store the embedding for a single invoice.
+
+    Sent server-to-server by the C# backend whenever an invoice is created or
+    its text changes. The text fields mirror the columns this service reads back
+    when searching (see ``hybrid_search`` / ``_format_snippet``): ``"Number"``,
+    ``"To"``, and ``"Notes"``.
+    """
+
+    document_id: str = Field(..., description="Invoice/document UUID")
+    number: str | None = Field(default=None, description='Invoice "Number"')
+    to: str | None = Field(default=None, description='Invoice "To" party')
+    notes: str | None = Field(default=None, description='Invoice "Notes"')
+
+
+class IndexResponse(BaseModel):
+    document_id: str
+    indexed: bool = True
+
+
 def _build_filter_clauses(filters: SearchFilters) -> tuple[list[str], dict[str, object]]:
     """Translate structured filters into parameterized SQL ``WHERE`` fragments.
 
@@ -153,3 +173,40 @@ async def hybrid_search(
         for row in rows
     ]
     return SearchResponse(results=results)
+
+
+def _build_index_text(request: IndexRequest) -> str:
+    """Concatenate the invoice's text fields into a single string to embed.
+
+    Only the fields that are actually present contribute, joined by newlines so
+    the embedding model sees them as distinct lines rather than one run-on token.
+    """
+    parts = [p for p in (request.number, request.to, request.notes) if p]
+    return "\n".join(parts)
+
+
+async def index_document(request: IndexRequest) -> bool:
+    """Embed an invoice's text fields and store the vector on its ``documents`` row.
+
+    Embeds the concatenated text via :func:`app.embeddings.embed_text`, then runs
+    a single ``UPDATE ... SET "Embedding" = ...`` keyed on the document id.
+
+    Returns ``True`` if a row was updated, or ``False`` if no row matched the id
+    (the caller maps this to ``404``).
+    """
+    text = _build_index_text(request)
+    embedding = await embeddings.embed_text(text)
+    # Same fully-parameterized vector literal used on the search path: bind the
+    # value and cast to ::vector so there is no SQL-injection surface.
+    vector_literal = "[" + ",".join(str(value) for value in embedding) + "]"
+
+    sql = 'UPDATE documents SET "Embedding" = %(embedding)s::vector WHERE "Id" = %(id)s::uuid'
+
+    async with get_connection() as conn:
+        async with conn.cursor() as cur:
+            await cur.execute(
+                sql, {"embedding": vector_literal, "id": request.document_id}
+            )
+            updated = cur.rowcount
+
+    return updated > 0
