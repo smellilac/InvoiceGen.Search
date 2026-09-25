@@ -30,6 +30,13 @@ class Settings(BaseSettings):
     langfuse_secret_key: str = ""
     langfuse_host: str = "https://cloud.langfuse.com"
 
+    # JWT authentication. The same HMAC-SHA256 (HS256) tokens the C# InvoiceGen
+    # backend issues to its users; this service validates signature, expiry,
+    # issuer, and audience. jwt_secret_key is the shared symmetric key.
+    jwt_secret_key: str = ""
+    jwt_issuer: str = ""
+    jwt_audience: str = ""
+
     # Service
     app_host: str = "0.0.0.0"
     app_port: int = 8000

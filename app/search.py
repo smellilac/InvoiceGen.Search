@@ -91,7 +91,9 @@ def _format_snippet(number: str | None, to: str | None, notes: str | None) -> st
     return snippet if len(snippet) <= 200 else snippet[:197] + "..."
 
 
-async def hybrid_search(request: SearchRequest) -> SearchResponse:
+async def hybrid_search(
+    request: SearchRequest, user_id: str | None = None
+) -> SearchResponse:
     """Run hybrid vector + filter search over invoices.
 
     Flow:
@@ -101,6 +103,10 @@ async def hybrid_search(request: SearchRequest) -> SearchResponse:
          ``request.filters``, ordered by similarity and capped at
          ``request.limit``.
       3. Execute against the Neon pool and map rows to :class:`SearchResult`.
+
+    ``user_id`` is the authenticated caller extracted from the JWT ``sub`` claim.
+    It is threaded through for future per-user scoping (e.g. restricting results
+    to a user's own invoices) but is not yet applied to the SQL.
     """
     # Langfuse observability: embedding calls made through app.embeddings are
     # traced automatically when the langfuse.openai wrapper is enabled there — no

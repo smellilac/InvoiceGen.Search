@@ -6,9 +6,10 @@ import logging
 from contextlib import asynccontextmanager
 
 import anyio
-from fastapi import FastAPI, HTTPException, status
+from fastapi import Depends, FastAPI, HTTPException, status
 
 from app import __version__
+from app.auth import require_user
 from app.config import get_settings
 from app.database import close_pool, open_pool, ping
 from app.observability import verify_langfuse_connection
@@ -91,10 +92,17 @@ async def health_db() -> dict[str, str]:
 
 
 @app.post("/search", response_model=SearchResponse)
-async def search(request: SearchRequest) -> SearchResponse:
-    """Hybrid semantic + filter search over invoices."""
+async def search(
+    request: SearchRequest,
+    user_id: str = Depends(require_user),
+) -> SearchResponse:
+    """Hybrid semantic + filter search over invoices.
+
+    Requires a valid JWT bearer token issued by the InvoiceGen backend; the
+    authenticated user id is threaded into the search for optional scoping.
+    """
     try:
-        return await hybrid_search(request)
+        return await hybrid_search(request, user_id=user_id)
     except RuntimeError as exc:
         # Raised when the database pool is not open (see app/database.py).
         logger.exception("Search failed: database unavailable")

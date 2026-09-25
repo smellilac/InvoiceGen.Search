@@ -13,6 +13,9 @@ dependencies = [
     "pgvector>=0.3.0",
     "openai>=1.51.0",
     "python-dotenv>=1.0.0",
+    # JWT validation for the C# backend's HS256 bearer tokens. The [cryptography]
+    # extra pulls in the backend used for signature verification.
+    "python-jose[cryptography]>=3.3.0",
     # Langfuse observability. The LangChain integration ships inside the langfuse
     # package (langfuse.langchain.CallbackHandler); it needs langchain present to
     # activate. Keep these in sync with requirements.txt.
