@@ -7,6 +7,7 @@ sets up the project structure.
 
 from __future__ import annotations
 
+import datetime
 from datetime import date
 
 from psycopg.rows import dict_row
@@ -36,11 +37,22 @@ class SearchRequest(BaseModel):
 
 
 class SearchResult(BaseModel):
-    """A single matched invoice."""
+    """A single matched invoice.
 
-    invoice_id: str
+    Field names mirror the shape the InvoiceGen frontend consumes directly:
+    ``id`` (used to navigate to ``/documents/{id}``) plus the columns rendered
+    on the result card. ``score`` is the pgvector cosine similarity, kept for
+    ranking/debugging (the frontend simply ignores it).
+    """
+
+    id: str
+    number: str | None = None
+    to: str | None = None
+    date: datetime.date | None = None
+    status: str | None = None
+    total: float | None = None
+    type: str | None = None
     score: float
-    snippet: str | None = None
 
 
 class SearchResponse(BaseModel):
@@ -52,8 +64,8 @@ class IndexRequest(BaseModel):
 
     Sent server-to-server by the C# backend whenever an invoice is created or
     its text changes. The text fields mirror the columns this service reads back
-    when searching (see ``hybrid_search`` / ``_format_snippet``): ``"Number"``,
-    ``"To"``, and ``"Notes"``.
+    when searching (see ``hybrid_search``): ``"Number"``, ``"To"``, and
+    ``"Notes"``.
     """
 
     document_id: str = Field(..., description="Invoice/document UUID")
@@ -102,15 +114,6 @@ def _build_filter_clauses(filters: SearchFilters) -> tuple[list[str], dict[str, 
     return clauses, params
 
 
-def _format_snippet(number: str | None, to: str | None, notes: str | None) -> str | None:
-    """Compose a short human-readable summary of a matched invoice."""
-    parts = [p for p in (number, to, notes) if p]
-    if not parts:
-        return None
-    snippet = " — ".join(parts)
-    return snippet if len(snippet) <= 200 else snippet[:197] + "..."
-
-
 async def hybrid_search(
     request: SearchRequest, user_id: str | None = None
 ) -> SearchResponse:
@@ -148,10 +151,13 @@ async def hybrid_search(
 
     sql = f"""
         SELECT
-            "Id"::text AS invoice_id,
+            "Id"::text AS id,
             "Number" AS number,
             "To" AS to_party,
-            "Notes" AS notes,
+            "Date" AS date,
+            "Status" AS status,
+            "Total" AS total,
+            "Type" AS type,
             1 - ("Embedding" <=> %(query_vec)s::vector) AS score
         FROM documents
         WHERE {where_sql}
@@ -166,9 +172,14 @@ async def hybrid_search(
 
     results = [
         SearchResult(
-            invoice_id=row["invoice_id"],
+            id=row["id"],
+            number=row["number"],
+            to=row["to_party"],
+            date=row["date"],
+            status=row["status"],
+            total=float(row["total"]) if row["total"] is not None else None,
+            type=row["type"],
             score=float(row["score"]),
-            snippet=_format_snippet(row["number"], row["to_party"], row["notes"]),
         )
         for row in rows
     ]
