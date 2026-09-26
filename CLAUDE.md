@@ -170,6 +170,12 @@ and capped at `limit`. Soft-deleted rows (`DeletedAt IS NOT NULL`) and rows with
 no embedding are excluded. Invoice and customer IDs are UUID strings, matching
 the InvoiceGen schema this service reads.
 
+Each result is shaped to match what the InvoiceGen frontend renders directly:
+`id` (used for navigating to `/documents/{id}`), `number`, `to`, `date`,
+`status`, `total`, and `type`, plus a `score` (cosine similarity) the frontend
+ignores. These map straight onto the `documents` columns of the same name (`Id`,
+`Number`, `To`, `Date`, `Status`, `Total`, `Type`).
+
 ## Authentication
 
 `POST /search` is protected by the `require_user` dependency in `app/auth.py`.
