@@ -2,7 +2,7 @@
 
 A Python **FastAPI** microservice that provides **semantic search** for the
 **InvoiceGen** invoice management application. It embeds natural-language queries
-with **OpenRouter embeddings** and runs **hybrid search** — pgvector similarity
+with **Google Gemini embeddings** and runs **hybrid search** — pgvector similarity
 combined with structured SQL filters — against the existing InvoiceGen Postgres
 database hosted on **Neon**.
 
@@ -145,9 +145,14 @@ uv run uvicorn app.main:app --reload
 See `.env.example`. Key variables:
 
 - `DATABASE_URL` — Neon Postgres connection string (`sslmode=require`).
-- `OPENROUTER_API_KEY` — OpenRouter API key (used for embeddings).
-- `EMBEDDING_MODEL` / `EMBEDDING_DIMENSIONS` — must match the dimensionality of
-  the `Embedding` `vector` column in the database (currently `vector(1024)`).
+- `OPENROUTER_API_KEY` — API key used by the embeddings client. Embeddings now
+  run on Google Gemini's OpenAI-compatible endpoint, so this must be a **Gemini
+  API key**.
+- `EMBEDDING_MODEL` / `EMBEDDING_BASE_URL` / `EMBEDDING_DIMENSIONS` — Gemini
+  embedding model (`gemini-embedding-001`), its OpenAI-compatible base URL, and
+  the output dimensionality. `EMBEDDING_DIMENSIONS` is sent as the `dimensions`
+  parameter (Gemini defaults to 3072) and must match the `Embedding` `vector`
+  column in the database (currently `vector(1024)`).
 - `JWT_SECRET_KEY` / `JWT_ISSUER` / `JWT_AUDIENCE` — shared HS256 signing key
   and the expected issuer/audience for validating the C# backend's JWTs. Must
   match the backend's token configuration.

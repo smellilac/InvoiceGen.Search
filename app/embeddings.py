@@ -42,8 +42,8 @@ logger = logging.getLogger("invoice_search")
 def get_client() -> AsyncOpenAI:
     """Return a cached AsyncOpenAI client pointed at the embeddings provider.
 
-    Embeddings are served through OpenRouter (see ``app/config.py``), which is
-    OpenAI-API compatible, so the OpenAI SDK talks to it directly given the
+    Embeddings are served through Google Gemini's OpenAI-compatible endpoint
+    (see ``app/config.py``), so the OpenAI SDK talks to it directly given the
     matching ``base_url`` and key.
 
     When Langfuse is configured, the client is Langfuse's drop-in
@@ -86,6 +86,7 @@ async def embed_text(text: str) -> list[float]:
     response = await get_client().embeddings.create(
         model=settings.embedding_model,
         input=text,
+        dimensions=settings.embedding_dimensions,
     )
     return _validate_dimensions(response.data[0].embedding)
 
@@ -98,6 +99,7 @@ async def embed_batch(texts: list[str]) -> list[list[float]]:
     response = await get_client().embeddings.create(
         model=settings.embedding_model,
         input=texts,
+        dimensions=settings.embedding_dimensions,
     )
     ordered = sorted(response.data, key=lambda item: item.index)
     return [_validate_dimensions(item.embedding) for item in ordered]

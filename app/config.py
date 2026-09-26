@@ -20,9 +20,12 @@ class Settings(BaseSettings):
     llm_model: str = "qwen/qwen3-8b:free"
     llm_base_url: str = "https://openrouter.ai/api/v1"
 
-    # Embeddings
-    embedding_model: str = "qwen/qwen3-embedding-0.6b"
-    embedding_base_url: str = "https://openrouter.ai/api/v1"
+    # Embeddings (Google Gemini via the OpenAI-compatible endpoint).
+    # gemini-embedding-001 defaults to 3072 dimensions; embedding_dimensions is
+    # sent as the `dimensions` parameter to request a 1024-vector that matches
+    # the pgvector column in the database.
+    embedding_model: str = "gemini-embedding-001"
+    embedding_base_url: str = "https://generativelanguage.googleapis.com/v1beta/openai/"
     embedding_dimensions: int = 1024
 
     # Langfuse observability (optional — disabled when keys are empty)
