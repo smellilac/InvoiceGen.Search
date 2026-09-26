@@ -13,7 +13,14 @@ from app.auth import require_user
 from app.config import get_settings
 from app.database import close_pool, open_pool, ping
 from app.observability import verify_langfuse_connection
-from app.search import SearchRequest, SearchResponse, hybrid_search
+from app.search import (
+    IndexRequest,
+    IndexResponse,
+    SearchRequest,
+    SearchResponse,
+    hybrid_search,
+    index_document,
+)
 
 logger = logging.getLogger("invoice_search")
 
@@ -110,6 +117,36 @@ async def search(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
             detail=str(exc),
         ) from exc
+
+
+@app.post("/index", response_model=IndexResponse)
+async def index(request: IndexRequest) -> IndexResponse:
+    """Generate and store the embedding for a single invoice.
+
+    Intentionally **public** (no JWT): this is called server-to-server by the C#
+    InvoiceGen backend, which authenticates via a separate mechanism rather than
+    the end-user bearer tokens ``/search`` expects.
+
+    Returns ``200`` on success and ``404`` if the document id does not exist in
+    the ``documents`` table.
+    """
+    try:
+        updated = await index_document(request)
+    except RuntimeError as exc:
+        # Raised when the database pool is not open (see app/database.py).
+        logger.exception("Index failed: database unavailable")
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail=str(exc),
+        ) from exc
+
+    if not updated:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Document {request.document_id} not found",
+        )
+
+    return IndexResponse(document_id=request.document_id)
 
 
 def main() -> None:

@@ -105,7 +105,8 @@ InvoiceGen (C#)  ──HTTP──▶  invoice-search-service (FastAPI)  ──�
 - **Auth / networking.** `POST /search` requires a JWT bearer token — the same
   HS256 token the C# backend issues to its users. The service validates the
   token's signature, expiry, issuer, and audience (see `app/auth.py`) and passes
-  the `sub` claim (user id) into the search. The health endpoints stay public.
+  the `sub` claim (user id) into the search. The health endpoints and the
+  server-to-server `POST /index` endpoint stay public.
 
 ## Project layout
 
@@ -139,6 +140,9 @@ uv run uvicorn app.main:app --reload
 - `GET /health` — liveness (no DB required).
 - `GET /health/db` — readiness; verifies the Neon database is reachable.
 - `POST /search` — hybrid semantic + filter search over the `documents` table.
+- `POST /index` — (re)generate and store the embedding for a single invoice.
+  Public (no JWT): called server-to-server by the C# backend. Returns `200` on
+  success, `404` if the document id is not found.
 
 ## Configuration
 
@@ -174,7 +178,8 @@ C# InvoiceGen backend issues to its users; the service verifies its signature
 (`JWT_SECRET_KEY`), expiry, issuer (`JWT_ISSUER`), and audience (`JWT_AUDIENCE`),
 then extracts the user id from the `sub` claim. A missing, malformed, expired, or
 otherwise invalid token returns `401 Unauthorized`. The health endpoints
-(`GET /health`, `GET /health/db`) remain public. The validated user id is
+(`GET /health`, `GET /health/db`) and `POST /index` remain public — the latter is
+a server-to-server call from the C# backend, which uses its own auth mechanism. The validated user id is
 threaded into `hybrid_search` for future per-user result scoping (not yet applied
 to the SQL).
 
