@@ -6,8 +6,8 @@ shutdown. Nothing here issues queries yet — search logic lives in ``search.py`
 
 from __future__ import annotations
 
+from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
-from typing import AsyncIterator
 
 from psycopg import AsyncConnection
 from psycopg_pool import AsyncConnectionPool
@@ -52,7 +52,7 @@ def get_pool() -> AsyncConnectionPool:
 
 
 @asynccontextmanager
-async def get_connection() -> AsyncIterator[AsyncConnection]:
+async def get_connection() -> AsyncGenerator[AsyncConnection]:
     """Acquire a connection from the pool as an async context manager."""
     async with get_pool().connection() as conn:
         yield conn

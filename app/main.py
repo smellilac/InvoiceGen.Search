@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import logging
+from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
 
 import anyio
@@ -42,7 +43,7 @@ def _configure_logging(level: str) -> None:
 
 
 @asynccontextmanager
-async def lifespan(app: FastAPI):
+async def lifespan(app: FastAPI) -> AsyncGenerator[None]:
     """Open the DB pool on startup, close it on shutdown."""
     settings = get_settings()
     _configure_logging(settings.log_level)

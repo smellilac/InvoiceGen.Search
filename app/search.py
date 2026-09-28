@@ -10,6 +10,7 @@ from __future__ import annotations
 import datetime
 from datetime import date
 
+from psycopg import sql
 from psycopg.rows import dict_row
 from pydantic import BaseModel, Field
 
@@ -79,36 +80,47 @@ class IndexResponse(BaseModel):
     indexed: bool = True
 
 
-def _build_filter_clauses(filters: SearchFilters) -> tuple[list[str], dict[str, object]]:
+def _build_filter_clauses(
+    filters: SearchFilters,
+) -> tuple[list[sql.Composable], dict[str, object]]:
     """Translate structured filters into parameterized SQL ``WHERE`` fragments.
 
-    Returns the list of conditions and the parameter map to bind. Only the
-    filters that are actually set contribute a clause, so an empty
-    ``SearchFilters`` narrows nothing beyond the always-on guards applied by the
-    caller (soft-delete and a non-null embedding).
+    Returns the list of conditions (as ``psycopg.sql`` composables) and the
+    parameter map to bind. Column names are emitted via ``sql.Identifier`` and
+    values stay bound through ``%(name)s`` placeholders — nothing is
+    string-concatenated into the query text. Only the filters that are actually
+    set contribute a clause, so an empty ``SearchFilters`` narrows nothing beyond
+    the always-on guards applied by the caller (soft-delete and a non-null
+    embedding).
     """
-    clauses: list[str] = []
+    clauses: list[sql.Composable] = []
     params: dict[str, object] = {}
 
     if filters.customer_id is not None:
-        clauses.append('"CustomerId" = %(customer_id)s::uuid')
+        clauses.append(
+            sql.SQL("{} = %(customer_id)s::uuid").format(sql.Identifier("CustomerId"))
+        )
         params["customer_id"] = filters.customer_id
     if filters.status is not None:
         # Status is stored as the enum name (e.g. "Paid"); match case-insensitively
         # so callers can pass "paid" as documented on the request model.
-        clauses.append('LOWER("Status") = LOWER(%(status)s)')
+        clauses.append(
+            sql.SQL("LOWER({}) = LOWER(%(status)s)").format(sql.Identifier("Status"))
+        )
         params["status"] = filters.status
     if filters.min_amount is not None:
-        clauses.append('"Total" >= %(min_amount)s')
+        clauses.append(sql.SQL("{} >= %(min_amount)s").format(sql.Identifier("Total")))
         params["min_amount"] = filters.min_amount
     if filters.max_amount is not None:
-        clauses.append('"Total" <= %(max_amount)s')
+        clauses.append(sql.SQL("{} <= %(max_amount)s").format(sql.Identifier("Total")))
         params["max_amount"] = filters.max_amount
     if filters.issued_after is not None:
-        clauses.append('"Date" >= %(issued_after)s')
+        clauses.append(sql.SQL("{} >= %(issued_after)s").format(sql.Identifier("Date")))
         params["issued_after"] = filters.issued_after
     if filters.issued_before is not None:
-        clauses.append('"Date" <= %(issued_before)s')
+        clauses.append(
+            sql.SQL("{} <= %(issued_before)s").format(sql.Identifier("Date"))
+        )
         params["issued_before"] = filters.issued_before
 
     return clauses, params
@@ -146,28 +158,45 @@ async def hybrid_search(
     params["query_vec"] = vector_literal
     params["limit"] = request.limit
 
-    conditions = ['"DeletedAt" IS NULL', '"Embedding" IS NOT NULL', *clauses]
-    where_sql = " AND ".join(conditions)
+    conditions: list[sql.Composable] = [
+        sql.SQL("{} IS NULL").format(sql.Identifier("DeletedAt")),
+        sql.SQL("{} IS NOT NULL").format(sql.Identifier("Embedding")),
+        *clauses,
+    ]
+    where_sql = sql.SQL(" AND ").join(conditions)
 
-    sql = f"""
+    query = sql.SQL(
+        """
         SELECT
-            "Id"::text AS id,
-            "Number" AS number,
-            "To" AS to_party,
-            "Date" AS date,
-            "Status" AS status,
-            "Total" AS total,
-            "Type" AS type,
-            1 - ("Embedding" <=> %(query_vec)s::vector) AS score
-        FROM documents
-        WHERE {where_sql}
-        ORDER BY "Embedding" <=> %(query_vec)s::vector ASC
+            {id}::text AS id,
+            {number} AS number,
+            {to} AS to_party,
+            {date} AS date,
+            {status} AS status,
+            {total} AS total,
+            {type} AS type,
+            1 - ({embedding} <=> %(query_vec)s::vector) AS score
+        FROM {table}
+        WHERE {where}
+        ORDER BY {embedding} <=> %(query_vec)s::vector ASC
         LIMIT %(limit)s
-    """
+        """
+    ).format(
+        id=sql.Identifier("Id"),
+        number=sql.Identifier("Number"),
+        to=sql.Identifier("To"),
+        date=sql.Identifier("Date"),
+        status=sql.Identifier("Status"),
+        total=sql.Identifier("Total"),
+        type=sql.Identifier("Type"),
+        embedding=sql.Identifier("Embedding"),
+        table=sql.Identifier("documents"),
+        where=where_sql,
+    )
 
     async with get_connection() as conn:
         async with conn.cursor(row_factory=dict_row) as cur:
-            await cur.execute(sql, params)
+            await cur.execute(query, params)
             rows = await cur.fetchall()
 
     results = [
