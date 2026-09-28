@@ -194,10 +194,9 @@ async def hybrid_search(
         where=where_sql,
     )
 
-    async with get_connection() as conn:
-        async with conn.cursor(row_factory=dict_row) as cur:
-            await cur.execute(query, params)
-            rows = await cur.fetchall()
+    async with get_connection() as conn, conn.cursor(row_factory=dict_row) as cur:
+        await cur.execute(query, params)
+        rows = await cur.fetchall()
 
     results = [
         SearchResult(
@@ -242,11 +241,10 @@ async def index_document(request: IndexRequest) -> bool:
 
     sql = 'UPDATE documents SET "Embedding" = %(embedding)s::vector WHERE "Id" = %(id)s::uuid'
 
-    async with get_connection() as conn:
-        async with conn.cursor() as cur:
-            await cur.execute(
-                sql, {"embedding": vector_literal, "id": request.document_id}
-            )
-            updated = cur.rowcount
+    async with get_connection() as conn, conn.cursor() as cur:
+        await cur.execute(
+            sql, {"embedding": vector_literal, "id": request.document_id}
+        )
+        updated = cur.rowcount
 
     return updated > 0

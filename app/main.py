@@ -51,7 +51,7 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None]:
         try:
             await open_pool()
             logger.info("Database pool opened")
-        except Exception:  # noqa: BLE001 - startup should not hard-fail without DB configured
+        except Exception:
             logger.exception("Failed to open database pool")
     else:
         logger.warning("DATABASE_URL not set; starting without a database connection")
@@ -64,7 +64,7 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None]:
             logger.info("Langfuse observability connected")
         else:
             logger.warning("Langfuse not configured; observability disabled")
-    except Exception:  # noqa: BLE001 - observability must never block startup
+    except Exception:
         logger.warning(
             "Langfuse connection check failed; continuing without observability",
             exc_info=True,
@@ -95,7 +95,7 @@ async def health_db() -> dict[str, str]:
     try:
         await ping()
         return {"status": "ok", "database": "reachable"}
-    except Exception as exc:  # noqa: BLE001
+    except Exception as exc:
         return {"status": "degraded", "database": f"unreachable: {exc}"}
 
 

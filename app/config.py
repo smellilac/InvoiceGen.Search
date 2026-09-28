@@ -41,7 +41,7 @@ class Settings(BaseSettings):
     jwt_audience: str = ""
 
     # Service
-    app_host: str = "0.0.0.0"
+    app_host: str = "0.0.0.0"  # noqa: S104 - binding to all interfaces is intended for the service
     app_port: int = 8000
     log_level: str = "info"
 

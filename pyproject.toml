@@ -23,16 +23,46 @@ dependencies = [
     "langchain>=0.3.0",
 ]
 
-[project.optional-dependencies]
-dev = [
-    "ruff>=0.6.0",
-    "pytest>=8.3.0",
-    "httpx>=0.27.0",
-]
-
 [tool.uv]
 package = false
 
 [tool.ruff]
 line-length = 100
 target-version = "py311"
+
+[tool.ruff.lint]
+select = [
+    "E", "W",   # pycodestyle — стиль по PEP 8
+    "F",        # pyflakes — неиспользуемые импорты и переменные, опечатки в именах
+    "I",        # isort — порядок импортов
+    "N",        # pep8-naming — snake_case, PascalCase
+    "UP",       # pyupgrade — устаревшие конструкции на современные
+    "B",        # flake8-bugbear — реальные ловушки, включая изменяемое умолчание
+    "SIM",      # flake8-simplify — упрощение условий и циклов
+    "RUF",      # собственные правила ruff
+    "ASYNC",    # ошибки в асинхронном коде: блокирующие вызовы внутри async
+    "S",        # bandit — безопасность, включая SQL-инъекции
+]
+ignore = [
+    "E501",     # длину строк контролирует форматтер, не линтер
+]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/*" = ["S101"]    # assert в тестах — это норма, bandit на него ругается
+
+[tool.ruff.format]
+quote-style = "double"
+
+[tool.pyright]
+typeCheckingMode = "strict"
+pythonVersion = "3.11"
+venvPath = "."
+venv = ".venv"
+
+[dependency-groups]
+dev = [
+    "pyright>=1.1.414",
+    "ruff>=0.6.0",
+    "pytest>=8.3.0",
+    "httpx>=0.27.0",
+]

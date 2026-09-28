@@ -60,8 +60,7 @@ async def get_connection() -> AsyncGenerator[AsyncConnection]:
 
 async def ping() -> bool:
     """Run a trivial query to confirm the database is reachable."""
-    async with get_connection() as conn:
-        async with conn.cursor() as cur:
-            await cur.execute("SELECT 1")
-            await cur.fetchone()
+    async with get_connection() as conn, conn.cursor() as cur:
+        await cur.execute("SELECT 1")
+        await cur.fetchone()
     return True
