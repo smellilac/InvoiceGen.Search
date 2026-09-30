@@ -54,7 +54,9 @@ def get_client() -> AsyncOpenAI:
 
     client_cls = AsyncOpenAI
     if get_langfuse() is not None:
-        from langfuse.openai import AsyncOpenAI as LangfuseAsyncOpenAI
+        from langfuse.openai import (
+            AsyncOpenAI as LangfuseAsyncOpenAI,  # pyright: ignore[reportPrivateImportUsage]
+        )
 
         client_cls = LangfuseAsyncOpenAI
         logger.info("Langfuse enabled; tracing embedding calls")

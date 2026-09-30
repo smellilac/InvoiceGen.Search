@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import logging
+from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
 
 import anyio
@@ -42,7 +43,7 @@ def _configure_logging(level: str) -> None:
 
 
 @asynccontextmanager
-async def lifespan(app: FastAPI):
+async def lifespan(app: FastAPI) -> AsyncGenerator[None]:
     """Open the DB pool on startup, close it on shutdown."""
     settings = get_settings()
     _configure_logging(settings.log_level)
@@ -50,7 +51,7 @@ async def lifespan(app: FastAPI):
         try:
             await open_pool()
             logger.info("Database pool opened")
-        except Exception:  # noqa: BLE001 - startup should not hard-fail without DB configured
+        except Exception:
             logger.exception("Failed to open database pool")
     else:
         logger.warning("DATABASE_URL not set; starting without a database connection")
@@ -63,7 +64,7 @@ async def lifespan(app: FastAPI):
             logger.info("Langfuse observability connected")
         else:
             logger.warning("Langfuse not configured; observability disabled")
-    except Exception:  # noqa: BLE001 - observability must never block startup
+    except Exception:
         logger.warning(
             "Langfuse connection check failed; continuing without observability",
             exc_info=True,
@@ -94,7 +95,7 @@ async def health_db() -> dict[str, str]:
     try:
         await ping()
         return {"status": "ok", "database": "reachable"}
-    except Exception as exc:  # noqa: BLE001
+    except Exception as exc:
         return {"status": "degraded", "database": f"unreachable: {exc}"}
 
 

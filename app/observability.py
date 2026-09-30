@@ -36,7 +36,7 @@ logger = logging.getLogger("invoice_search")
 
 
 @lru_cache
-def get_langfuse() -> "Langfuse | None":
+def get_langfuse() -> Langfuse | None:
     """Return a cached Langfuse client, or ``None`` if credentials aren't set.
 
     Constructing the client registers it as the process-global Langfuse instance,
@@ -56,7 +56,7 @@ def get_langfuse() -> "Langfuse | None":
     )
 
 
-def get_langfuse_handler() -> "CallbackHandler | None":
+def get_langfuse_handler() -> CallbackHandler | None:
     """Return a Langfuse LangChain ``CallbackHandler``, or ``None`` if disabled.
 
     Pass the result to any LangChain call as a callback::
