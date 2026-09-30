@@ -18,23 +18,24 @@ from app import embeddings
 from app.database import get_connection
 
 
-class SearchFilters(BaseModel):
-    """Structured SQL filters applied alongside vector similarity."""
+class SearchRequest(BaseModel):
+    """Incoming hybrid search request from the C# backend.
 
+    Filters are sent flat at the top level (not nested), matching the JSON the
+    C# backend posts, e.g.::
+
+        {"query": "...", "status": "draft", "min_amount": 100,
+         "date_from": "2026-01-01", "date_to": "2026-03-31", "limit": 10}
+    """
+
+    query: str = Field(..., description="Natural-language search text")
+    limit: int = Field(default=10, ge=1, le=100)
     customer_id: str | None = Field(default=None, description="Customer UUID")
     status: str | None = Field(default=None, description="e.g. draft, sent, paid, overdue")
     min_amount: float | None = None
     max_amount: float | None = None
-    issued_after: date | None = None
-    issued_before: date | None = None
-
-
-class SearchRequest(BaseModel):
-    """Incoming hybrid search request from the C# backend."""
-
-    query: str = Field(..., description="Natural-language search text")
-    filters: SearchFilters = Field(default_factory=SearchFilters)
-    limit: int = Field(default=10, ge=1, le=100)
+    date_from: date | None = None
+    date_to: date | None = None
 
 
 class SearchResult(BaseModel):
@@ -81,7 +82,7 @@ class IndexResponse(BaseModel):
 
 
 def _build_filter_clauses(
-    filters: SearchFilters,
+    request: SearchRequest,
 ) -> tuple[list[sql.Composable], dict[str, object]]:
     """Translate structured filters into parameterized SQL ``WHERE`` fragments.
 
@@ -89,39 +90,37 @@ def _build_filter_clauses(
     parameter map to bind. Column names are emitted via ``sql.Identifier`` and
     values stay bound through ``%(name)s`` placeholders — nothing is
     string-concatenated into the query text. Only the filters that are actually
-    set contribute a clause, so an empty ``SearchFilters`` narrows nothing beyond
+    set contribute a clause, so a request with no filters narrows nothing beyond
     the always-on guards applied by the caller (soft-delete and a non-null
     embedding).
     """
     clauses: list[sql.Composable] = []
     params: dict[str, object] = {}
 
-    if filters.customer_id is not None:
+    if request.customer_id is not None:
         clauses.append(
             sql.SQL("{} = %(customer_id)s::uuid").format(sql.Identifier("CustomerId"))
         )
-        params["customer_id"] = filters.customer_id
-    if filters.status is not None:
+        params["customer_id"] = request.customer_id
+    if request.status is not None:
         # Status is stored as the enum name (e.g. "Paid"); match case-insensitively
         # so callers can pass "paid" as documented on the request model.
         clauses.append(
             sql.SQL("LOWER({}) = LOWER(%(status)s)").format(sql.Identifier("Status"))
         )
-        params["status"] = filters.status
-    if filters.min_amount is not None:
+        params["status"] = request.status
+    if request.min_amount is not None:
         clauses.append(sql.SQL("{} >= %(min_amount)s").format(sql.Identifier("Total")))
-        params["min_amount"] = filters.min_amount
-    if filters.max_amount is not None:
+        params["min_amount"] = request.min_amount
+    if request.max_amount is not None:
         clauses.append(sql.SQL("{} <= %(max_amount)s").format(sql.Identifier("Total")))
-        params["max_amount"] = filters.max_amount
-    if filters.issued_after is not None:
-        clauses.append(sql.SQL("{} >= %(issued_after)s").format(sql.Identifier("Date")))
-        params["issued_after"] = filters.issued_after
-    if filters.issued_before is not None:
-        clauses.append(
-            sql.SQL("{} <= %(issued_before)s").format(sql.Identifier("Date"))
-        )
-        params["issued_before"] = filters.issued_before
+        params["max_amount"] = request.max_amount
+    if request.date_from is not None:
+        clauses.append(sql.SQL("{} >= %(date_from)s").format(sql.Identifier("Date")))
+        params["date_from"] = request.date_from
+    if request.date_to is not None:
+        clauses.append(sql.SQL("{} <= %(date_to)s").format(sql.Identifier("Date")))
+        params["date_to"] = request.date_to
 
     return clauses, params
 
@@ -135,7 +134,7 @@ async def hybrid_search(
       1. Embed ``request.query`` via :func:`app.embeddings.embed_text`.
       2. Build a single SQL query combining pgvector cosine distance
          (``"Embedding" <=> :query_vec``) with ``WHERE`` clauses from
-         ``request.filters``, ordered by similarity and capped at
+         the request's structured filters, ordered by similarity and capped at
          ``request.limit``.
       3. Execute against the Neon pool and map rows to :class:`SearchResult`.
 
@@ -154,7 +153,7 @@ async def hybrid_search(
     # surface) without depending on per-connection type registration.
     vector_literal = "[" + ",".join(str(value) for value in query_vector) + "]"
 
-    clauses, params = _build_filter_clauses(request.filters)
+    clauses, params = _build_filter_clauses(request)
     params["query_vec"] = vector_literal
     params["limit"] = request.limit
 
