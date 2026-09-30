@@ -189,6 +189,24 @@ a server-to-server call from the C# backend, which uses its own auth mechanism. 
 threaded into `hybrid_search` for future per-user result scoping (not yet applied
 to the SQL).
 
+## Contract snapshot tests — do not change without permission
+
+Files under `**/__snapshots__/*.ambr` describe the exact JSON shape this service
+expects from the C# backend (the search request) and sends back to it (the
+search response). They live alongside the tests in `tests/test_search_contract.py`
+and are generated/checked with **syrupy** (`uv run pytest tests`).
+
+If a code change causes one of these snapshot tests to fail, that means the wire
+contract changed — intentionally or not. Claude Code must **NOT** run pytest with
+`--snapshot-update`, edit a `.ambr` file directly, or delete a snapshot file to
+make the test pass, without the user explicitly reviewing the diff and approving
+the change first. Report the failing test and the exact diff instead, and wait
+for confirmation before touching any snapshot file.
+
+This applies even when the surrounding task is unrelated to search — if an
+incidental change (e.g. a Pydantic model field rename) breaks one of these tests,
+stop and flag it rather than updating the snapshot to match the new output.
+
 ## Not implemented yet
 
 - Per-user filtering of search results (the `sub` user id is threaded through

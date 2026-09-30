@@ -1,0 +1,29 @@
+# serializer version: 1
+# name: test_search_request_matches_csharp_payload
+  dict({
+    'customer_id': '3f1c2d4e-5a6b-7c8d-9e0f-1a2b3c4d5e6f',
+    'date_from': datetime.date(2026, 1, 1),
+    'date_to': datetime.date(2026, 3, 31),
+    'limit': 25,
+    'max_amount': 5000.0,
+    'min_amount': 500.0,
+    'query': 'unpaid invoices for acme over 500 dollars',
+    'status': 'overdue',
+  })
+# ---
+# name: test_search_response_matches_wire_shape
+  dict({
+    'results': list([
+      dict({
+        'date': '2026-02-14',
+        'id': '3f1c2d4e-5a6b-7c8d-9e0f-1a2b3c4d5e6f',
+        'number': 'INV-2026-0042',
+        'score': 0.9231,
+        'status': 'Overdue',
+        'to': 'Acme Corporation',
+        'total': 1234.56,
+        'type': 'Invoice',
+      }),
+    ]),
+  })
+# ---
